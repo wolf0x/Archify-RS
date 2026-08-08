@@ -13,12 +13,13 @@ triggers:
   - "mermaid"
 ---
 
-
 # Archify-RS
 
 Create a self-contained, interactive HTML diagram from a small typed JSON specification. Static output is the default; enable motion only when the user asks for a demo or presentation.
 
 **This is the Rust implementation** — zero dependencies, no Node.js required. Single binary, fast startup, cross-platform.
+
+This skill package is fully self-contained: the JSON Schemas (`schemas/`), example IR files (`examples/`), and the viewer template (`assets/template.html`) are bundled as real files inside this directory. Nothing here depends on other directories in the repository, so the skill keeps working even if sibling folders (e.g. a Node.js `skills/archify` reference copy) are deleted.
 
 ## Fast authoring path
 
@@ -80,6 +81,16 @@ archify-rs render -t architecture -i architecture.json -o architecture.html
 ```
 
 Supported languages: Python, Rust, TypeScript, Go, Java.
+
+## Bundled reference material
+
+| Path | Purpose |
+|---|---|
+| `schemas/*.schema.json` | Official Archify JSON Schemas (draft 2020-12) — validation contract |
+| `examples/*.json` | One validated example per diagram type, plus an `archify-repo` analyzer sample |
+| `assets/template.html` | The unmodified Archify viewer template embedded into every output |
+
+Use these for field shapes and vocabulary only. Never copy example facts (names, IDs, domain wording) into new diagrams.
 
 ## Authoring invariants
 
