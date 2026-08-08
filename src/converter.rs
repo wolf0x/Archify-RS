@@ -60,16 +60,23 @@ struct FlowNode { id: String, label: String, shape: Option<String> }
 #[derive(Debug, Clone)]
 struct FlowEdge { from: String, to: String, label: Option<String>, variant: String }
 
-fn shape_type_from_pair(pair: &Pair<Rule>) -> Option<String> {
+fn shape_type_from_pair(pair: &Pair<Rule>) -> (Option<String>, Option<String>) {
     let text = pair.as_str();
-    if text.starts_with("[[") { Some("[[".to_string()) }
+    let shape = if text.starts_with("[[") { Some("[[".to_string()) }
     else if text.starts_with("[(") { Some("[(]".to_string()) }
     else if text.starts_with("((") { Some("((".to_string()) }
     else if text.starts_with("[") { Some("[".to_string()) }
     else if text.starts_with("(") { Some("(".to_string()) }
     else if text.starts_with("{") { Some("{".to_string()) }
     else if text.starts_with(">") { Some(">".to_string()) }
-    else { None }
+    else { None };
+    
+    // Extract label from inside the shape
+    let label = pair.clone().into_inner().find(|p| p.as_rule() == Rule::label).map(|l| {
+        l.as_str().trim().trim_matches('"').trim_matches('\'').to_string()
+    }).filter(|s| !s.is_empty());
+    
+    (shape, label)
 }
 
 fn parse_flowchart(pair: Pair<Rule>) -> (Vec<FlowNode>, Vec<FlowEdge>) {
@@ -110,13 +117,36 @@ fn parse_flowchart(pair: Pair<Rule>) -> (Vec<FlowNode>, Vec<FlowEdge>) {
                             }
                             Rule::node_shape => {
                                 if let Some((id, _)) = pending.take() {
-                                    pending = Some((id, shape_type_from_pair(&sub)));
+                                    let (shape, label) = shape_type_from_pair(&sub);
+                                    // Update node label if we have one
+                                    if let Some(ref l) = label {
+                                        if let Some(&i) = by_id.get(&id) {
+                                            if nodes[i].label == id {
+                                                nodes[i].label = l.clone();
+                                            }
+                                        }
+                                    }
+                                    pending = Some((id, shape));
                                 }
                             }
-                            Rule::solid_arrow => { pv = "default".into(); pl = arrow_label(&sub, "default"); }
-                            Rule::dotted_arrow => { pv = "dashed".into(); pl = arrow_label(&sub, "dashed"); }
-                            Rule::thick_arrow => { pv = "emphasis".into(); pl = arrow_label(&sub, "emphasis"); }
-                            Rule::plain_arrow => { pv = "default".into(); pl = None; }
+                            Rule::arrow => {
+                                // Arrow is a parent rule, need to check which specific arrow type
+                                for arrow_sub in sub.into_inner() {
+                                    match arrow_sub.as_rule() {
+                                        Rule::solid_arrow => { 
+                                            pv = "default".into(); 
+                                            pl = arrow_label(&arrow_sub, "default");
+                                        }
+                                        Rule::dotted_arrow => { pv = "dashed".into(); pl = arrow_label(&arrow_sub, "dashed"); }
+                                        Rule::thick_arrow => { pv = "emphasis".into(); pl = arrow_label(&arrow_sub, "emphasis"); }
+                                        Rule::plain_arrow => { 
+                                            pv = "default".into(); 
+                                            pl = None;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -124,14 +154,19 @@ fn parse_flowchart(pair: Pair<Rule>) -> (Vec<FlowNode>, Vec<FlowEdge>) {
                 Rule::node_stmt => {
                     let mut id = String::new();
                     let mut shape: Option<String> = None;
+                    let mut label: Option<String> = None;
                     for sub in part.into_inner() {
                         match sub.as_rule() {
                             Rule::node_id => id = sub.as_str().to_string(),
-                            Rule::node_shape => shape = shape_type_from_pair(&sub),
+                            Rule::node_shape => {
+                                let (s, l) = shape_type_from_pair(&sub);
+                                shape = s;
+                                label = l;
+                            }
                             _ => {}
                         }
                     }
-                    if !id.is_empty() { ensure(&id, None, shape.as_deref(), &mut nodes, &mut by_id); }
+                    if !id.is_empty() { ensure(&id, label.as_deref(), shape.as_deref(), &mut nodes, &mut by_id); }
                 }
                 _ => {}
             }
@@ -142,6 +177,18 @@ fn parse_flowchart(pair: Pair<Rule>) -> (Vec<FlowNode>, Vec<FlowEdge>) {
 
 fn arrow_label(pair: &Pair<Rule>, _family: &str) -> Option<String> {
     let text = pair.as_str();
+    
+    // Try to extract label from inner label rule first
+    for inner in pair.clone().into_inner() {
+        if inner.as_rule() == Rule::label {
+            let label = inner.as_str().trim();
+            if !label.is_empty() {
+                return Some(label.trim_matches('"').trim_matches('\'').to_string());
+            }
+        }
+    }
+    
+    // Fallback: try to extract from text patterns
     for candidate in [text.strip_prefix("--").and_then(|t| t.strip_suffix("-->")),
                        text.strip_prefix("-.").and_then(|t| t.strip_suffix(".->")),
                        text.strip_prefix("==").and_then(|t| t.strip_suffix("==>"))].into_iter().flatten() {

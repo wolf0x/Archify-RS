@@ -82,6 +82,19 @@ archify-rs render -t architecture -i architecture.json -o architecture.html
 
 Supported languages: Python, Rust, TypeScript, Go, Java.
 
+## Architecture comparison
+
+Compare two architecture snapshots to visualize what changed:
+
+```bash
+archify-rs compare -a base.architecture.json -b head.architecture.json -o delta.html
+```
+
+The delta page shows:
+- Added, removed, and modified components/connections/boundaries
+- Before/Delta/After views with interactive review
+- Per-entity change markers and classifications
+
 ## Bundled reference material
 
 | Path | Purpose |
@@ -132,6 +145,7 @@ Return the rendered HTML path, diagram type, and validation status. Do not claim
 
 - **No Node.js required** — single binary, zero dependencies
 - **Faster startup** — milliseconds vs seconds
-- **Smaller footprint** — ~9MB binary vs full Node.js runtime
+- **Smaller footprint** — 6.6MB binary (3.1MB minimal) vs full Node.js runtime
 - **Same output** — pixel-identical HTML using the same template
 - **Same schemas** — 100% compatible with official Archify JSON IR
+- **Architecture delta** — compare two snapshots and visualize changes

@@ -32,7 +32,8 @@ node_shape = {
 }
 
 // Arrow families: solid, dotted (async), thick (emphasis), plus inline labels.
-solid_arrow = { "--" ~ label? ~ "-->" | "-->" ~ "|" ~ label ~ "|" }
+// Order matters: try pipe-label format first to avoid ambiguity with plain_arrow
+solid_arrow = { "-->" ~ "|" ~ label ~ "|" | "--" ~ label? ~ "-->" }
 dotted_arrow = { "-." ~ label? ~ ".->" | "-.->" }
 thick_arrow = { "==" ~ label? ~ "==>" }
 plain_arrow = { "---" | "-->" }
