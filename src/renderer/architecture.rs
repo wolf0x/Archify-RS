@@ -57,22 +57,6 @@ pub fn render_svg(arch: &Value) -> Result<String> {
     let components_map = measure_components(arch, &grid);
     let component_steps = component_steps(arch, &components_map);
     let boundaries = measure_boundaries(arch, &components_map);
-    let composition_frames: Vec<(String, String, f64, f64, f64, f64, f64)> = boundaries
-        .iter()
-        .enumerate()
-        .map(|(index, b)| {
-            (
-                b.0.clone(),
-                b.1.clone(),
-                b.2,
-                b.3,
-                b.4,
-                b.5,
-                if b.1 == "security-group" { 8.0 } else { 12.0 },
-            )
-        })
-        .collect();
-    let _ = composition_frames;
 
     let component_contexts: HashMap<String, String> = components_map
         .iter()

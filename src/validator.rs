@@ -63,19 +63,31 @@ fn validator_for(diagram_type: &str) -> Result<std::sync::Arc<Validator>> {
     let schema = SCHEMA_DOCS
         .get(schema_name.as_str())
         .ok_or_else(|| anyhow!("unknown diagram type \"{diagram_type}\". Expected one of: {}", DIAGRAM_TYPES.join(", ")))?;
+    
+    // Check cache first
     {
         let cache = VALIDATORS.lock().unwrap();
         if let Some(validator) = cache.get(&schema_name) {
             return Ok(validator.clone());
         }
     }
+    
+    // Compile validator outside lock to avoid holding it during expensive work
     let mut options = jsonschema::options();
     options.with_draft(Draft::Draft202012).with_retriever(EmbeddedRetriever);
     let validator = options
         .build(schema)
         .with_context(|| format!("failed to compile schema for diagram type \"{diagram_type}\""))?;
     let validator = std::sync::Arc::new(validator);
-    VALIDATORS.lock().unwrap().insert(schema_name, validator.clone());
+    
+    // Insert into cache, handling race condition where another thread may have
+    // compiled the same validator while we were working
+    let mut cache = VALIDATORS.lock().unwrap();
+    if let Some(existing) = cache.get(&schema_name) {
+        // Another thread compiled it first; use their version
+        return Ok(existing.clone());
+    }
+    cache.insert(schema_name, validator.clone());
     Ok(validator)
 }
 
@@ -96,9 +108,9 @@ fn collect_errors(validator: &Validator, instance: &Value) -> Vec<String> {
 fn format_error(error: &ValidationError) -> String {
     let path = error.instance_path.to_string();
     if path.is_empty() {
-        format!("{}. {}", path, error)
+        format!("{error}")
     } else {
-        format!("{}. {}", path, error)
+        format!("{path}: {error}")
     }
 }
 
@@ -121,8 +133,21 @@ pub fn validate_value(diagram_type: &str, value: &Value) -> Result<ValidationRep
     Ok(ValidationReport { bytes: serde_json::to_vec(value).map(|v| v.len()).unwrap_or(0) })
 }
 
+/// Maximum input file size (100 MB) to prevent memory exhaustion attacks.
+const MAX_INPUT_SIZE: usize = 100 * 1024 * 1024;
+
 /// Validate a JSON IR file on disk.
 pub fn validate_file(input: &std::path::Path, diagram_type: &str) -> Result<ValidationReport> {
+    let metadata = std::fs::metadata(input)
+        .with_context(|| format!("cannot access input file {}", input.display()))?;
+    if metadata.len() > MAX_INPUT_SIZE as u64 {
+        bail!(
+            "input file {} is too large ({} bytes). Maximum allowed: {} bytes",
+            input.display(),
+            metadata.len(),
+            MAX_INPUT_SIZE
+        );
+    }
     let text = std::fs::read_to_string(input)
         .with_context(|| format!("cannot read input file {}", input.display()))?;
     let value: Value = serde_json::from_str(&text)

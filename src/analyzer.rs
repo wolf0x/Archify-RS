@@ -76,7 +76,7 @@ struct Module {
 /// Sanitize a relative module path into a schema-valid id
 /// (`^[a-zA-Z][a-zA-Z0-9_-]*$`).
 fn sanitize_id(relative: &str) -> String {
-    let mut out: String = relative
+    let sanitized: String = relative
         .chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
@@ -86,13 +86,13 @@ fn sanitize_id(relative: &str) -> String {
             }
         })
         .collect();
-    while out.starts_with('_') {
-        out.remove(0);
+    // Strip leading underscores efficiently
+    let trimmed = sanitized.trim_start_matches('_');
+    if trimmed.is_empty() || !trimmed.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+        format!("m{trimmed}")
+    } else {
+        trimmed.to_string()
     }
-    if out.is_empty() || !out.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
-        out.insert(0, 'm');
-    }
-    out
 }
 
 /// Infer a component kind from the module path.
@@ -380,15 +380,27 @@ pub fn analyze_repo(root: &Path, lang_override: Option<&str>) -> Result<Value> {
         }
     }
     // Compute grid columns via topological depth of the dependency graph.
-    let mut changed = true;
-    while changed {
-        changed = false;
+    // Use Bellman-Ford with iteration limit to detect cycles.
+    let mut depth: HashMap<String, usize> = modules.iter().map(|m| (m.id.clone(), 0)).collect();
+    let max_iterations = modules.len() + 1;
+    for iteration in 0..max_iterations {
+        let mut changed = false;
         for (from, to) in &internal_edges {
             let from_depth = depth.get(from).copied().unwrap_or(0);
             let to_depth = depth.get(to).copied().unwrap_or(0);
             if from_depth + 1 > to_depth {
                 depth.insert(to.clone(), from_depth + 1);
                 changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+        if iteration == max_iterations - 1 {
+            // Cycle detected — fall back to depth 0 for all modules
+            log::warn!("dependency cycle detected; using flat layout");
+            for d in depth.values_mut() {
+                *d = 0;
             }
         }
     }

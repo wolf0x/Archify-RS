@@ -20,21 +20,17 @@ const FOOTER_PLACEHOLDER: &str = "[Project Name] &bull; [Additional metadata]";
 const GUIDED_VIEWS_PLACEHOLDER: &str = "<!-- ARCHIFY:GUIDED_VIEWS_DATA -->";
 const SOURCE_EVIDENCE_PLACEHOLDER: &str = "    <!-- ARCHIFY:SOURCE_EVIDENCE_DATA -->";
 
-const ESCAPE_MAP: [(char, &str); 5] = [
-    ('&', "&amp;"),
-    ('<', "&lt;"),
-    ('>', "&gt;"),
-    ('"', "&quot;"),
-    ('\'', "&#39;"),
-];
-
 /// HTML-escape a value exactly like the original `esc()` helper.
 pub fn esc(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
-        match ESCAPE_MAP.iter().find(|(from, _)| *from == ch) {
-            Some((_, to)) => out.push_str(to),
-            None => out.push(ch),
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(ch),
         }
     }
     out

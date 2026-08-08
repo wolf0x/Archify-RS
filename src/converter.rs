@@ -14,7 +14,20 @@ use serde_json::{json, Value};
 #[grammar = "mermaid.pest"]
 struct MermaidParser;
 
+/// Maximum input file size (10 MB) for Mermaid files.
+const MAX_INPUT_SIZE: usize = 10 * 1024 * 1024;
+
 pub fn convert_file(input: &Path, type_name: &str) -> Result<Value> {
+    let metadata = std::fs::metadata(input)
+        .with_context(|| format!("cannot access input file {}", input.display()))?;
+    if metadata.len() > MAX_INPUT_SIZE as u64 {
+        bail!(
+            "input file {} is too large ({} bytes). Maximum allowed: {} bytes",
+            input.display(),
+            metadata.len(),
+            MAX_INPUT_SIZE
+        );
+    }
     let text = std::fs::read_to_string(input)
         .with_context(|| format!("cannot read input file {}", input.display()))?;
     convert_str(&text, type_name)
@@ -51,7 +64,7 @@ fn shape_type_from_pair(pair: &Pair<Rule>) -> Option<String> {
     let text = pair.as_str();
     if text.starts_with("[[") { Some("[[".to_string()) }
     else if text.starts_with("[(") { Some("[(]".to_string()) }
-    else if text.starts_with("((") { Some("(((".to_string()) }
+    else if text.starts_with("((") { Some("((".to_string()) }
     else if text.starts_with("[") { Some("[".to_string()) }
     else if text.starts_with("(") { Some("(".to_string()) }
     else if text.starts_with("{") { Some("{".to_string()) }

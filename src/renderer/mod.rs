@@ -78,6 +78,10 @@ fn write_diagram(
 
     let mut template = TEMPLATE_HTML.to_string();
     if let Some(theme) = theme {
+        // Validate theme to prevent XSS injection
+        if theme != "dark" && theme != "light" {
+            bail!("invalid theme: {theme:?}. Expected \"dark\" or \"light\"");
+        }
         // The template resolves the theme before first paint (URL param,
         // localStorage, then prefers-color-scheme). When the user pins a theme
         // via `--theme`, mirror that choice into the same mechanism the
@@ -108,8 +112,21 @@ fn write_diagram(
     Ok(())
 }
 
+/// Maximum input file size (100 MB) to prevent memory exhaustion attacks.
+const MAX_INPUT_SIZE: usize = 100 * 1024 * 1024;
+
 /// Render a JSON IR file into a standalone HTML diagram.
 pub fn render_file(input: &Path, output: &Path, diagram_type: &str, theme: Option<&str>) -> Result<PathBuf> {
+    let metadata = std::fs::metadata(input)
+        .with_context(|| format!("cannot access input file {}", input.display()))?;
+    if metadata.len() > MAX_INPUT_SIZE as u64 {
+        bail!(
+            "input file {} is too large ({} bytes). Maximum allowed: {} bytes",
+            input.display(),
+            metadata.len(),
+            MAX_INPUT_SIZE
+        );
+    }
     let text = std::fs::read_to_string(input)
         .with_context(|| format!("cannot read input file {}", input.display()))?;
     let ir: Value = serde_json::from_str(&text)
