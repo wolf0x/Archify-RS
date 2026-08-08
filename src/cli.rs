@@ -39,7 +39,10 @@ pub enum Command {
     /// Convert a Mermaid text file (flowchart / sequenceDiagram) into JSON IR
     Convert(ConvertArgs),
     /// Analyze a source repository and emit an architecture JSON IR
+    #[cfg(feature = "analyzer")]
     Analyze(AnalyzeArgs),
+    /// Compare two architecture IR files and render a delta diagram (base → head)
+    Compare(CompareArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -99,5 +102,20 @@ pub struct AnalyzeArgs {
 
     /// Output JSON IR path
     #[arg(short = 'o', long, value_name = "IR.json", default_value = "architecture.json")]
+    pub output: PathBuf,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct CompareArgs {
+    /// Input base (previous) architecture IR file
+    #[arg(short = 'a', long, value_name = "BASE.json")]
+    pub base: PathBuf,
+
+    /// Input head (current) architecture IR file
+    #[arg(short = 'b', long, value_name = "HEAD.json")]
+    pub head: PathBuf,
+
+    /// Output HTML delta diagram path
+    #[arg(short = 'o', long, value_name = "DELTA.html", default_value = "archify-delta.html")]
     pub output: PathBuf,
 }

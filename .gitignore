@@ -6,8 +6,12 @@ target/
 !skills/archify-rs/schemas/*.json
 !skills/archify-rs/examples/*.json
 !skills/archify-rs/assets/*.html
+!src/*.html
 !tests/goldens/
 tmp-*
 
 # Local reference copy of the original Node.js skill; not part of the repo.
 skills/archify/
+
+# Skill package archives (exported zip snapshots)
+skills/*.zip

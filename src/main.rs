@@ -5,9 +5,11 @@
 //! project and are never rewritten: this binary only injects rendered SVG and
 //! authored metadata into the template's sentinel slots.
 
+#[cfg(feature = "analyzer")]
 mod analyzer;
 mod cli;
 mod converter;
+mod delta;
 mod renderer;
 mod template;
 mod validator;
@@ -53,6 +55,7 @@ fn main() -> Result<()> {
             println!("{}", args.output.display());
             Ok(())
         }
+        #[cfg(feature = "analyzer")]
         Command::Analyze(args) => {
             let ir = analyzer::analyze_repo(&args.path, args.lang.as_deref())?;
             let json = serde_json::to_string_pretty(&ir)?;
@@ -63,6 +66,24 @@ fn main() -> Result<()> {
                     args.path.display(),
                     ir["components"].as_array().map(|a| a.len()).unwrap_or(0),
                     args.output.display()
+                );
+            }
+            println!("{}", args.output.display());
+            Ok(())
+        }
+        Command::Compare(args) => {
+            let receipt = delta::compare_files(&args.base, &args.head, &args.output)?;
+            if cli.verbose {
+                info!(
+                    "compared {} vs {} -> {} ({} changes)",
+                    args.base.display(),
+                    args.head.display(),
+                    args.output.display(),
+                    receipt
+                        .pointer("/changes/components")
+                        .and_then(|c| c.as_array())
+                        .map(|c| c.len())
+                        .unwrap_or(0)
                 );
             }
             println!("{}", args.output.display());
