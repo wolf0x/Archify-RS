@@ -1,0 +1,12 @@
+Fix encoding corruption and bugs in delta.rs
+
+- Fix mojibake: 18 occurrences of corrupted arrow character
+- Fix summary key mismatch: convert status to camelCase (evidence-changed to evidenceChanged)
+- Fix cursor bug in aria-labelledby rewriting after replace_range
+- Fix tag matching: <g to <g or <g> to avoid false positives like <gizmo>
+- Fix tag matching: <rect to <rect or <rect/> to avoid false positives like <rectangle>
+- Remove dead code: no-op result.replace
+- Optimize architecture_delta_change_rows: single iteration instead of 3 passes
+- Remove trailing blank lines at end of file
+
+All 36 tests pass. Delta output verified: 442KB HTML with correct semantic parity.

@@ -1,4 +1,4 @@
-//! Architecture delta comparison 閳?faithful port of the original
+//! Architecture delta comparison → faithful port of the original
 //! `delta/architecture-delta.mjs`.
 //!
 //! `compare_file` renders both snapshots, computes a change receipt
@@ -25,7 +25,7 @@ const DELTA_TEMPLATE: &str = include_str!("delta_template.html");
 // Canonicalization
 // ---------------------------------------------------------------------------
 
-/// JS `canonical(value)` 閳?deterministic serialization used for equality.
+/// JS `canonical(value)` → deterministic serialization used for equality.
 fn canonical(value: &Value) -> String {
     match value {
         Value::Array(items) => {
@@ -49,7 +49,7 @@ fn equal(left: &Value, right: &Value) -> bool {
     canonical(left) == canonical(right)
 }
 
-/// `equal` for optional values 閳?`None` compares as `null`.
+/// `equal` for optional values → `None` compares as `null`.
 fn equal_option(left: &Option<Value>, right: &Option<Value>) -> bool {
     equal(&left.clone().unwrap_or(Value::Null), &right.clone().unwrap_or(Value::Null))
 }
@@ -63,7 +63,7 @@ fn sorted_objects(values: &Value) -> Value {
     Value::Array(items)
 }
 
-/// `normalizeRepository` 閳?URL trimmed/`.git`-stripped/lowercased.
+/// `normalizeRepository` → URL trimmed/`.git`-stripped/lowercased.
 fn normalize_repository(repository: Option<&Value>) -> Option<Value> {
     let repository = repository?;
     if repository.is_null() {
@@ -88,7 +88,7 @@ fn normalize_repository(repository: Option<&Value>) -> Option<Value> {
     Some(json!({ "url": url, "revision": revision }))
 }
 
-/// `canonicalArchitecture` 閳?normalized snapshot for deterministic geometry.
+/// `canonicalArchitecture` → normalized snapshot for deterministic geometry.
 pub fn canonical_architecture(diagram: &Value) -> Value {
     let mut meta = diagram
         .get("meta")
@@ -330,7 +330,12 @@ fn summary_for(changes: &[Value], shape: &[&str]) -> Value {
     }
     for change in changes {
         let status = change.get("status").and_then(Value::as_str).unwrap_or("");
-        let key = status.replace('-', "_");
+        // Convert hyphenated status to camelCase to match summary shape keys.
+        let key = status
+            .split('-')
+            .enumerate()
+            .map(|(i, part)| if i == 0 { part.to_string() } else { part[..1].to_uppercase() + &part[1..] })
+            .collect::<String>();
         if let Some(count) = summary.get_mut(&key) {
             if let Value::Number(number) = count {
                 if let Some(value) = number.as_u64() {
@@ -356,7 +361,7 @@ fn presentation_changed(base: &Value, head: &Value) -> bool {
     !equal(&pick(base), &pick(head))
 }
 
-/// `compareArchitecture` 閳?full receipt computation.
+/// `compareArchitecture` → full receipt computation.
 pub fn compare_architecture(base: &Value, head: &Value) -> Result<Value> {
     require_comparable_shape(base, "base")?;
     require_comparable_shape(head, "head")?;
@@ -486,7 +491,7 @@ fn esc(value: &str) -> String {
     out
 }
 
-/// `safeJson` 閳?JSON string with HTML-significant characters escaped.
+/// `safeJson` → JSON string with HTML-significant characters escaped.
 fn safe_json(value: &Value) -> String {
     serde_json::to_string_pretty(value)
         .unwrap_or_default()
@@ -495,7 +500,7 @@ fn safe_json(value: &Value) -> String {
         .replace('&', "\\u0026")
 }
 
-/// `extractArchitectureSvg` 閳?primary diagram SVG from a rendered artifact.
+/// `extractArchitectureSvg` → primary diagram SVG from a rendered artifact.
 pub fn extract_architecture_svg(html: &str) -> Result<String> {
     let marker = r#"<svg viewBox="0 0 "#;
     let start = html.find(marker).ok_or_else(|| anyhow::anyhow!("delta/svg-missing: A validated Architecture artifact did not contain its primary SVG."))?;
@@ -506,7 +511,7 @@ pub fn extract_architecture_svg(html: &str) -> Result<String> {
     Ok(html[start..end].to_string())
 }
 
-/// `extractArtifactCss` 閳?the artifact `<style>` block.
+/// `extractArtifactCss` → the artifact `<style>` block.
 pub fn extract_artifact_css(html: &str) -> Result<String> {
     let start = html.find("<style>").ok_or_else(|| anyhow::anyhow!("delta/css-missing: A validated Architecture artifact did not contain its stylesheet."))?;
     let content_start = start + "<style>".len();
@@ -642,7 +647,7 @@ fn read_attr_number(haystack: &str, from: usize, attr: &str) -> Option<f64> {
     rest[..end].parse().ok()
 }
 
-/// `prefixSvgIds` 閳?namespace all ids and url(#...) references.
+/// `prefixSvgIds` → namespace all ids and url(#...) references.
 fn prefix_svg_ids(svg: &str, prefix: &str) -> String {
     let ids: Vec<String> = svg
         .match_indices(" id=\"")
@@ -675,19 +680,19 @@ fn prefix_svg_ids(svg: &str, prefix: &str) -> String {
     let mut cursor = 0;
     while let Some(rel) = result[cursor..].find("aria-labelledby=\"") {
         let start = cursor + rel + "aria-labelledby=\"".len();
-        let end = result[start..].find('\"').map(|e| start + e).unwrap_or(result.len());
+        let end = result[start..].find('"').map(|e| start + e).unwrap_or(result.len());
         let rewritten: String = result[start..end]
             .split_whitespace()
             .map(|id| format!("{prefix}-{id}"))
             .collect::<Vec<_>>()
             .join(" ");
         result.replace_range(start..end, &rewritten);
-        cursor = end + rewritten.len();
+        cursor = start + rewritten.len();
     }
     result
 }
 
-/// `staticize` 閳?strip interactive affordances from snapshot SVGs.
+/// `staticize` → strip interactive affordances from snapshot SVGs.
 fn staticize(svg: &str) -> String {
     svg.replace("tabindex=\"0\" role=\"button\"", "role=\"group\"")
         .replace(" aria-pressed=\"false\"", "")
@@ -699,9 +704,9 @@ fn node_group_ranges(svg: &str) -> Vec<(String, usize, usize)> {
     let mut ranges = Vec::new();
     let mut search_from = 0;
     while let Some(open_index) = svg[search_from..].find("data-node-id=\"") {
-        let open_start = svg[..search_from].len() + open_index;
+        let open_start = search_from + open_index;
         // Rewind to the start of the <g ...> tag.
-        let tag_start = svg[..open_start].rfind("<g").map(|i| i).unwrap_or(open_start);
+        let tag_start = svg[..open_start].rfind("<g ").or_else(|| svg[..open_start].rfind("<g>")).unwrap_or(open_start);
         let id_start = open_start + "data-node-id=\"".len();
         let id_end = svg[id_start..].find('"').map(|i| id_start + i).unwrap_or(id_start);
         let id = svg[id_start..id_end].to_string();
@@ -746,15 +751,15 @@ fn node_group_ranges(svg: &str) -> Vec<(String, usize, usize)> {
     ranges
 }
 
-/// `transformBoundaryPairs` 閳?rect + text pairs for structural frames.
+/// `transformBoundaryPairs` → rect + text pairs for structural frames.
 fn transform_boundary_pairs(svg: &str, transform: &dyn Fn(&str, &str) -> String) -> String {
     let mut result = String::with_capacity(svg.len());
     let mut last = 0;
     let mut cursor = 0;
     while let Some(rel) = svg[cursor..].find("data-graph-role=\"structural-frame\"") {
-        let rect_start = svg[..cursor].len() + rel;
+        let rect_start = cursor + rel;
         // Rewind to <rect.
-        let tag_start = svg[..rect_start].rfind("<rect").map(|i| i).unwrap_or(rect_start);
+        let tag_start = svg[..rect_start].rfind("<rect ").or_else(|| svg[..rect_start].rfind("<rect/>")).unwrap_or(rect_start);
         let rect_end = svg[rect_start..].find("/>").map(|i| rect_start + i + 2).unwrap_or(rect_start);
         // Next <text ...>...</text>.
         let text_start = svg[rect_end..].find("<text").map(|i| rect_end + i);
@@ -792,7 +797,7 @@ fn transform_boundary_pairs(svg: &str, transform: &dyn Fn(&str, &str) -> String)
     result
 }
 
-/// `annotateArchitectureSideSvg` 閳?per-side change state markup.
+/// `annotateArchitectureSideSvg` → per-side change state markup.
 fn annotate_architecture_side_svg(svg: &str, receipt: &Value, side: &str) -> String {
     let nodes = change_map(receipt.pointer("/changes/components").unwrap_or(&Value::Null));
     let edges = change_map(receipt.pointer("/changes/connections").unwrap_or(&Value::Null));
@@ -837,7 +842,6 @@ fn annotate_architecture_side_svg(svg: &str, receipt: &Value, side: &str) -> Str
     result = rebuilt;
 
     // Edges.
-    result = result.replace("<path ", "<path "); // no-op; see below
     // Add state to every path/g carrying data-edge-id.
     let mut edge_result = String::with_capacity(result.len());
     let mut last = 0;
@@ -863,7 +867,7 @@ fn annotate_architecture_side_svg(svg: &str, receipt: &Value, side: &str) -> Str
     prefix_svg_ids(&staticize(&result), side)
 }
 
-/// `elementById` 閳?node group or edge path/label markup for an id.
+/// `elementById` → node group or edge path/label markup for an id.
 fn element_by_id(svg: &str, kind: &str, id: &str) -> String {
     if kind == "node" {
         return node_group_ranges(svg)
@@ -938,13 +942,13 @@ fn force_element_state(markup: &str, state: &str, classifications: &[String]) ->
     result
 }
 
-/// `boundaryPairByKey` 閳?structural-frame pair whose kind:label equals key.
+/// `boundaryPairByKey` → structural-frame pair whose kind:label equals key.
 fn boundary_pair_by_key(svg: &str, key: &str) -> String {
     let mut found = String::new();
     let mut cursor = 0;
     while let Some(rel) = svg[cursor..].find("data-graph-role=\"structural-frame\"") {
-        let rect_start = svg[..cursor].len() + rel;
-        let tag_start = svg[..rect_start].rfind("<rect").map(|i| i).unwrap_or(rect_start);
+        let rect_start = cursor + rel;
+        let tag_start = svg[..rect_start].rfind("<rect ").or_else(|| svg[..rect_start].rfind("<rect/>")).unwrap_or(rect_start);
         let rect_end = svg[rect_start..].find("/>").map(|i| rect_start + i + 2).unwrap_or(rect_start);
         let text_start = svg[rect_end..].find("<text").map(|i| rect_end + i);
         let Some(text_start) = text_start else { break };
@@ -1039,7 +1043,7 @@ fn boundary_symbol_markup(markup: &str, state: &str) -> String {
     )
 }
 
-/// `buildDeltaSvg` 閳?annotated head SVG with baseline phantoms and markers.
+/// `buildDeltaSvg` → annotated head SVG with baseline phantoms and markers.
 fn build_delta_svg(base_svg: &str, head_svg: &str, receipt: &Value) -> String {
     let (base_w, base_h) = view_box_size(base_svg);
     let (head_w, head_h) = view_box_size(head_svg);
@@ -1173,44 +1177,67 @@ fn build_delta_svg(base_svg: &str, head_svg: &str, receipt: &Value) -> String {
 // ---------------------------------------------------------------------------
 
 fn architecture_delta_change_rows(receipt: &Value) -> Vec<Value> {
-    let mut rows: Vec<Value> = Vec::new();
-    for change in receipt.pointer("/changes/components").and_then(Value::as_array).cloned().unwrap_or_default() {
-        let id = change.get("id").and_then(Value::as_str).unwrap_or("");
-        rows.push(json!({ "kind": "Component", "kindKey": "component", "key": format!("component:{id}"), "id": id }));
-    }
-    for change in receipt.pointer("/changes/connections").and_then(Value::as_array).cloned().unwrap_or_default() {
-        let id = change.get("id").and_then(Value::as_str).unwrap_or("");
-        rows.push(json!({ "kind": "Relationship", "kindKey": "relationship", "key": format!("relationship:{id}"), "id": id }));
-    }
-    for change in receipt.pointer("/changes/boundaries").and_then(Value::as_array).cloned().unwrap_or_default() {
-        let key = change.get("key").and_then(Value::as_str).unwrap_or("");
-        rows.push(json!({ "kind": "Boundary", "kindKey": "boundary", "key": format!("boundary:{key}"), "id": key }));
-    }
     let mut combined: Vec<Value> = Vec::new();
-    for change in receipt.pointer("/changes/components").and_then(Value::as_array).cloned().unwrap_or_default()
-        .into_iter()
-        .chain(receipt.pointer("/changes/connections").and_then(Value::as_array).cloned().unwrap_or_default())
-        .chain(receipt.pointer("/changes/boundaries").and_then(Value::as_array).cloned().unwrap_or_default())
-    {
-        combined.push(change);
-    }
-    // Merge kind metadata onto the change objects.
-    let mut index = 0;
-    for change in &mut combined {
-        let row = &rows[index];
-        if let Value::Object(map) = change {
-            map.insert("kind".to_string(), row.get("kind").cloned().unwrap());
-            map.insert("kindKey".to_string(), row.get("kindKey").cloned().unwrap());
-            map.insert("key".to_string(), row.get("key").cloned().unwrap());
-            if !map.contains_key("id") {
-                map.insert("id".to_string(), row.get("id").cloned().unwrap());
+    
+    // Collect component changes with metadata.
+    if let Some(changes) = receipt.pointer("/changes/components").and_then(Value::as_array) {
+        for change in changes {
+            let id = change.get("id").and_then(Value::as_str).unwrap_or("");
+            let mut row = change.clone();
+            if let Value::Object(map) = &mut row {
+                map.insert("kind".to_string(), Value::String("Component".to_string()));
+                map.insert("kindKey".to_string(), Value::String("component".to_string()));
+                map.insert("key".to_string(), Value::String(format!("component:{id}")));
             }
+            combined.push(row);
         }
-        index += 1;
     }
+    
+    // Collect connection changes with metadata.
+    if let Some(changes) = receipt.pointer("/changes/connections").and_then(Value::as_array) {
+        for change in changes {
+            let id = change.get("id").and_then(Value::as_str).unwrap_or("");
+            let mut row = change.clone();
+            if let Value::Object(map) = &mut row {
+                map.insert("kind".to_string(), Value::String("Relationship".to_string()));
+                map.insert("kindKey".to_string(), Value::String("relationship".to_string()));
+                map.insert("key".to_string(), Value::String(format!("relationship:{id}")));
+            }
+            combined.push(row);
+        }
+    }
+    
+    // Collect boundary changes with metadata.
+    if let Some(changes) = receipt.pointer("/changes/boundaries").and_then(Value::as_array) {
+        for change in changes {
+            let key = change.get("key").and_then(Value::as_str).unwrap_or("");
+            let mut row = change.clone();
+            if let Value::Object(map) = &mut row {
+                map.insert("kind".to_string(), Value::String("Boundary".to_string()));
+                map.insert("kindKey".to_string(), Value::String("boundary".to_string()));
+                map.insert("key".to_string(), Value::String(format!("boundary:{key}")));
+                if !map.contains_key("id") {
+                    map.insert("id".to_string(), Value::String(key.to_string()));
+                }
+            }
+            combined.push(row);
+        }
+    }
+    
+    // Sort by status, kind, id for stable ordering.
     combined.sort_by(|a, b| {
-        let a_key = format!("{}:{}:{}", a.get("status").and_then(Value::as_str).unwrap_or(""), a.get("kind").and_then(Value::as_str).unwrap_or(""), a.get("id").and_then(Value::as_str).unwrap_or(""));
-        let b_key = format!("{}:{}:{}", b.get("status").and_then(Value::as_str).unwrap_or(""), b.get("kind").and_then(Value::as_str).unwrap_or(""), b.get("id").and_then(Value::as_str).unwrap_or(""));
+        let a_key = format!(
+            "{}:{}:{}",
+            a.get("status").and_then(Value::as_str).unwrap_or(""),
+            a.get("kind").and_then(Value::as_str).unwrap_or(""),
+            a.get("id").and_then(Value::as_str).unwrap_or("")
+        );
+        let b_key = format!(
+            "{}:{}:{}",
+            b.get("status").and_then(Value::as_str).unwrap_or(""),
+            b.get("kind").and_then(Value::as_str).unwrap_or(""),
+            b.get("id").and_then(Value::as_str).unwrap_or("")
+        );
         a_key.cmp(&b_key)
     });
     combined
@@ -1241,7 +1268,7 @@ fn review_primary_states(row: &Value) -> Vec<String> {
     vec![status.to_string()]
 }
 
-/// `expectedReviewTargetSignature` 閳?server-side signature the client verifies.
+/// `expectedReviewTargetSignature` → server-side signature the client verifies.
 fn expected_review_target_signature(row: &Value) -> String {
     let classifications: Vec<String> = row
         .get("classifications")
@@ -1343,7 +1370,7 @@ fn render_change_row(row: &Value, index: usize) -> String {
     )
 }
 
-/// `renderArchitectureDeltaHtml` 閳?standalone review page.
+/// `renderArchitectureDeltaHtml` → standalone review page.
 fn render_delta_html(receipt: &Value, base_svg: &str, delta_svg: &str, head_svg: &str, artifact_css: &str) -> String {
     let rows = architecture_delta_change_rows(receipt);
     let changed = total(receipt, "changed");
@@ -1361,7 +1388,7 @@ fn render_delta_html(receipt: &Value, base_svg: &str, delta_svg: &str, head_svg:
     let details_open = if rows_count <= 10 { " open" } else { "" };
     let mut html = DELTA_TEMPLATE
         .replace("__ARCHIFY_DELTA_PROOF__", &esc(proof))
-        .replace("__ARCHIFY_DELTA_SUBTITLE__", &esc(&format!("{base_title} 閳?{head_title}")))
+        .replace("__ARCHIFY_DELTA_SUBTITLE__", &esc(&format!("{base_title} → {head_title}")))
         .replace("__ARCHIFY_DELTA_ADDED__", &total(receipt, "added").to_string())
         .replace("__ARCHIFY_DELTA_REMOVED__", &total(receipt, "removed").to_string())
         .replace("__ARCHIFY_DELTA_CHANGED__", &changed.to_string())
@@ -1479,4 +1506,3 @@ mod tests {
         assert!(annotated.contains("id=\"head-arrowhead\""));
     }
 }
-
