@@ -1,6 +1,6 @@
 [package]
 name = "archify-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Zero-dependency Archify CLI: architecture visualization from JSON IR, Mermaid, or source repositories, without Node.js"
 license = "MIT"
