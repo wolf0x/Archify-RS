@@ -1,0 +1,67 @@
+// Mermaid subset grammar for Archify-RS (flowchart + sequenceDiagram).
+// Rules are intentionally permissive: unknown directives degrade gracefully.
+
+WHITESPACE = _{ " " | "\t" }
+NEWLINE = _{ "\r\n" | "\n" | "\r" }
+
+comment = _{ "%%" ~ (!NEWLINE ~ ANY)* }
+
+document = { SOI ~ (flowchart | sequence_diagram) ~ EOI }
+
+// ---------------------------------------------------------------------------
+// Flowchart
+// ---------------------------------------------------------------------------
+
+flowchart = { "flowchart" ~ direction? ~ NEWLINE+ ~ flowchart_line* }
+direction = { "LR" | "RL" | "TD" | "TB" | "BT" }
+
+node_id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+label = { quoted | (!(NEWLINE | "|" | "]" | ")" | "}" | ">" | "--" | "-." | "==") ~ ANY)+ }
+quoted = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" | "'" ~ (!"'" ~ ANY)* ~ "'" }
+
+node_shape = {
+    "[[" ~ label ~ "]]"
+  | "[(" ~ label ~ ")]"
+  | "((" ~ label ~ "))"
+  | "[" ~ label ~ "]"
+  | "(" ~ label ~ ")"
+  | "{" ~ label ~ "}"
+  | ">" ~ label ~ "]"
+  | "[" ~ label ~ ")"
+}
+
+// Arrow families: solid, dotted (async), thick (emphasis), plus inline labels.
+solid_arrow = { "--" ~ label? ~ "-->" | "-->" ~ "|" ~ label ~ "|" }
+dotted_arrow = { "-." ~ label? ~ ".->" | "-.->" }
+thick_arrow = { "==" ~ label? ~ "==>" }
+plain_arrow = { "---" | "-->" }
+arrow = { solid_arrow | dotted_arrow | thick_arrow | plain_arrow }
+
+edge_stmt = { node_id ~ node_shape? ~ (arrow ~ node_id ~ node_shape?)+ }
+node_stmt = { node_id ~ node_shape? }
+
+// Each flowchart line consumes the trailing newline so the * loop can continue.
+// After the last line the EOF is accepted by SOI/EOI.
+flowchart_line = {
+    (edge_stmt | node_stmt) ~ NEWLINE?
+}
+
+// ---------------------------------------------------------------------------
+// Sequence diagram
+// ---------------------------------------------------------------------------
+
+sequence_diagram = { "sequenceDiagram" ~ NEWLINE+ ~ (seq_line ~ NEWLINE?)* }
+
+seq_line = { participant | activate_stmt | deactivate_stmt | note_stmt | message_stmt | seq_other }
+
+participant = { ("participant" | "actor") ~ node_id ~ ("as" ~ seq_label)? }
+activate_stmt = { "activate" ~ node_id }
+deactivate_stmt = { "deactivate" ~ node_id }
+note_stmt = { "Note" ~ ("over" | "left of" | "right of") ~ node_id ~ ("," ~ node_id)* ~ ":" ~ seq_label }
+
+seq_arrow = { "-->>" | "->>" | "-->" | "->" | "-)" | "--)" | "->)" | "-->)" | "x" ~ "-" | "x" ~ "--" | "x" ~ "-->" | "x" ~ "->" }
+
+message_stmt = { node_id ~ seq_arrow ~ node_id ~ (":" ~ seq_label)? }
+seq_label = { (!NEWLINE ~ ANY)+ }
+seq_other = { (ASCII_ALPHANUMERIC | " " | "\t" | "(" | ")" | "[" | "]" | "{" | "}" | ":" | "," | "." | "-" | "_" | "/" | "#")+ }
