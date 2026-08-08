@@ -44,6 +44,18 @@ The binary will be at `target/release/archify-rs.exe`.
 - **Mermaid converter** — flowchart → workflow, sequenceDiagram → sequence
 - **Repository analyzer** — Python, Rust, TypeScript, Go, Java (tree-sitter)
 - **JSON Schema validation** — embedded official Archify schemas
+- **AI Skill support** — includes skill definition for AI assistant integration
+
+## AI Skill Integration
+
+Archify-RS includes a skill definition for AI assistants in `skills/archify-rs/`. This enables AI tools to:
+
+- Generate architecture diagrams from natural language descriptions
+- Convert Mermaid diagrams to Archify format
+- Analyze code repositories automatically
+- Validate JSON IR against official schemas
+
+See `skills/archify-rs/README.md` for details.
 
 ## License
 
